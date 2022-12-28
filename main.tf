@@ -1,57 +1,26 @@
 provider "aws" {
-    region     = var.region
-    access_key = var.access_key
-    secret_key = var.secret_key
+     region     = var.region
+     access_key = var.access_key
+     secret_key = var.secret_key
+}
+resource "aws_vpc" "vpc" {
+    cidr_block = "10.0.0.0/16"
 }
 
-resource "aws_s3_bucket" "blog" {
-    bucket = "${var.blog_bucket_subdomain}.${var.root_domain}"
+resource "aws_internet_gateway" "gateway" {
+    vpc_id = aws_vpc.vpc.id
 }
+resource "aws_route" "route" {
+    route_table_id         = aws_vpc.vpc.main_route_table_id
+    destination_cidr_block = "0.0.0.0/0"
+    gateway_id             = aws_internet_gateway.gateway.id
+}
+data "aws_availability_zones" "available" {}
 
-resource "aws_s3_bucket_website_configuration" "blog" {
-    bucket = aws_s3_bucket.blog.id
-    
-    index_document {
-        suffix = "index.html"
-    }
-    
-    error_document {
-        key = "error.html"
-    }
-}
-
-resource "aws_s3_bucket_acl" "blog_bucket_acl" {
-    bucket = aws_s3_bucket.blog.id
-    acl    = "public-read"
-}
-
-resource "aws_s3_object" "upload_object" {
-    for_each = fileset("html/", "*")
-    bucket = aws_s3_bucket.blog.id
-    key    = each.value
-    source = "html/${each.value}"
-    etag = filemd5("html/${each.value}")
-    content_type = "text/html"
-}
-
-resource "aws_s3_bucket_policy" "read_access_policy" {
-    bucket = aws_s3_bucket.blog.id
-    policy = <<POLICY
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "PublicReadGetObject",
-            "Effect": "Allow",
-            "Principal": "*",
-            "Action": [
-                "s3:GetObject"
-            ],
-            "Resource": [
-                "arn:aws:s3:::${aws_s3_bucket.blog.id}/*"
-            ]
-        }
-    ]
-}
-POLICY
+resource "aws_subnet" "main" {
+   count                   = length(data.aws_availability_zones.available.names)
+   vpc_id                  = aws_vpc.vpc.id
+   cidr_block              = "10.0.${count.index}.0/24"
+   map_public_ip_on_launch = true
+   availability_zone       = element(data.aws_availability_zones.available.names, count.index)
 }

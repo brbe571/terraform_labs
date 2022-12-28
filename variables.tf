@@ -1,15 +1,9 @@
-# required for aws
-variable "access_key" {}
-variable "secret_key" {}
+variable "access_key" {
+    description = "Access key to AWS console"
+}
+variable "secret_key" {
+    description = "Secret key to AWS console"
+}
 variable "region" {
-    default = "us-east-1"
+    description = "Region of AWS VPC"
 }
-
-variable "root_domain" {
-    default = "whizlabs-s3-bucket-demo-1991018945472"
-}
-
-variable "blog_bucket_subdomain" {
-    default = "blog"
-}
-
