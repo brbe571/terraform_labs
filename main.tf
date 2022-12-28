@@ -1,24 +1,57 @@
-terraform {
-  required_providers {
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "~> 2.13.0"
+provider "aws" {
+    region     = var.region
+    access_key = var.access_key
+    secret_key = var.secret_key
+}
+
+resource "aws_s3_bucket" "blog" {
+    bucket = "${var.blog_bucket_subdomain}.${var.root_domain}"
+}
+
+resource "aws_s3_bucket_website_configuration" "blog" {
+    bucket = aws_s3_bucket.blog.id
+    
+    index_document {
+        suffix = "index.html"
     }
-  }
+    
+    error_document {
+        key = "error.html"
+    }
 }
 
-provider "docker" {}
-
-resource "docker_image" "nginx" {
-  name         = "nginx:latest"
-  keep_locally = false
+resource "aws_s3_bucket_acl" "blog_bucket_acl" {
+    bucket = aws_s3_bucket.blog.id
+    acl    = "public-read"
 }
 
-resource "docker_container" "nginx" {
-  image = docker_image.nginx.latest
-  name  = "tutorial"
-  ports {
-    internal = 80
-    external = 8000
-  }
+resource "aws_s3_object" "upload_object" {
+    for_each = fileset("html/", "*")
+    bucket = aws_s3_bucket.blog.id
+    key    = each.value
+    source = "html/${each.value}"
+    etag = filemd5("html/${each.value}")
+    content_type = "text/html"
+}
+
+resource "aws_s3_bucket_policy" "read_access_policy" {
+    bucket = aws_s3_bucket.blog.id
+    policy = <<POLICY
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicReadGetObject",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+                "s3:GetObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${aws_s3_bucket.blog.id}/*"
+            ]
+        }
+    ]
+}
+POLICY
 }
